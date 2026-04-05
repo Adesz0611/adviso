@@ -1,0 +1,3 @@
+[submodule "libs/cfd_lib"]
+	path = libs/cfd_lib
+	url = git@github.com:Adesz0611/cfd_lib.git
