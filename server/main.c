@@ -6,6 +6,8 @@
 
 #include "mongoose.h"
 
+#define PUBLIC_DIR "frontend"
+
 typedef struct WS_Client {
     CFD_Arena arena;
     u64 user_id;
@@ -83,7 +85,7 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
             mg_http_reply(c, 200, "Content-Type: application/json\r\n", "{%m:%d}", mg_print_esc, 0, "success", 1);
         } else {
             struct mg_http_serve_opts opts = {
-                .root_dir = "public",
+                .root_dir = PUBLIC_DIR,
             };
 
             mg_http_serve_dir(c, hm, &opts);

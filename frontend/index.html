@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGPU CFD Viewer</title>
+    <link rel="icon" href="data:,">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* Színváltozók a könnyű módosításhoz */
+            --bg-canvas: #1a1a1a;
+            --bg-panel: #141414;
+            --bg-input: #2a2a2a;
+            --text-main: #e0e0e0;
+            --text-muted: #888;
+            --accent-color: #ff3b30; /* A piros szín */
+            --accent-hover: #d63026;
+            --border-color: #333;
+            --sidebar-width: 280px;
+        }
+
+        /* 1. FŐ ELRENDEZÉS - GÖRGETÉS TILTÁSA */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* <--- EZ SZÜNTETI MEG A KÜLSŐ GÖRGETÉST */
+            background-color: var(--bg-canvas);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+            display: flex; /* Flexbox: elemek egymás mellett */
+        }
+
+        /* 2. BAL OLDALI SÁV */
+        #sidebar {
+            width: var(--sidebar-width);
+            height: 100%;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-color); /* Választóvonal jobbra */
+            
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+            box-sizing: border-box; /* A padding ne növelje a méretet */
+            
+            flex-shrink: 0; /* Ne nyomódjon össze */
+            z-index: 10;
+            overflow-y: auto; /* Csak a sáv görgessen, ha nem fér ki */
+        }
+
+        /* 3. CANVAS KONTÉNER (Jobb oldal) */
+        #canvas-wrapper {
+            flex-grow: 1; /* Kitölti a maradék helyet */
+            position: relative; /* Hogy a statisztika abszolút lehessen benne */
+            height: 100%;
+            background-color: black;
+            overflow: hidden; 
+        }
+
+        canvas {
+            display: block; /* Eltünteti a rejtett hézagokat */
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- UI DESIGN ELEMEK --- */
+        h2 { 
+            margin: 0 0 10px 0; 
+            font-size: 18px; 
+            font-weight: 600; 
+            color: var(--accent-color); 
+            text-transform: uppercase; 
+            letter-spacing: 1px; 
+            border-bottom: 1px solid var(--border-color); 
+            padding-bottom: 10px; 
+        }
+
+        .control-group { 
+            background-color: rgba(255,255,255,0.02); 
+            padding: 15px; 
+            border-radius: 8px; 
+            border: 1px solid var(--border-color); 
+        }
+
+        .control-group label { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            font-size: 13px; 
+            margin-bottom: 8px; 
+            color: var(--text-muted); 
+        }
+        
+        .value-display { color: var(--text-main); font-weight: 500; font-family: monospace; }
+
+        /* Input stílusok */
+        input[type=range] { width: 100%; -webkit-appearance: none; background: transparent; margin: 5px 0; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--bg-input); border-radius: 2px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: var(--accent-color); margin-top: -6px; cursor: pointer; transition: background 0.2s; }
+        
+        select { width: 100%; padding: 8px; background-color: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px; outline: none; cursor: pointer; }
+        
+        button { width: 100%; padding: 10px; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; text-transform: uppercase; font-size: 12px; transition: background 0.2s; }
+        button:hover { background-color: var(--accent-hover); }
+
+        /* FPS Számláló (Jobb felső sarok a canvas felett) */
+        #stats {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            text-align: right;
+            color: var(--text-muted);
+            font-family: monospace;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* --- MOBIL NÉZET (< 800px) --- */
+        @media (max-width: 800px) {
+            body, html { 
+                flex-direction: column-reverse; /* Gombok alul, Canvas felül */
+            }
+            #sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 40vh; /* Max 40%-át foglalja el a képernyőnek */
+                border-right: none;
+                border-top: 1px solid var(--border-color);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h2>ADVISO</h2>
+
+        <div class="control-group">
+            <label>Variable</label>
+            <select id="variable-select">
+                <option value="velocity">Velocity</option>
+                <option value="pressure">Pressure</option>
+                <option value="temp">Temperature</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>
+                Time Step
+                <span class="value-display" id="time-val">0</span>
+            </label>
+            <input type="range" id="time-slider" min="0" max="100" value="0" step="1">
+            
+            <div style="display: flex; gap: 5px; margin-top: 10px;">
+                <button id="play-btn">▶ Play</button>
+                <button id="stop-btn" style="background-color: #444;">■ Stop</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Visualization</label>
+            <label>
+                Mesh Opacity
+                <span class="value-display" id="opacity-val">1.0</span>
+            </label>
+            <input type="range" id="opacity-slider" min="0" max="1" step="0.05" value="1">
+            
+            <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="wireframe-chk" style="accent-color: var(--accent-color);">
+                <label for="wireframe-chk" style="margin:0; cursor: pointer;">Show Wireframe</label>
+            </div>
+        </div>
+        
+        <div class="control-group" style="flex-grow: 1; min-height: 100px; display: flex; flex-direction: column;">
+            <label>Color Map</label>
+            <div style="flex-grow: 1; background: linear-gradient(to top, blue, cyan, green, yellow, red); border-radius: 4px; position: relative;">
+                 <span style="position: absolute; top: 5px; right: 5px; font-size: 10px; background: rgba(0,0,0,0.5); padding: 2px 4px; border-radius: 3px;">Max</span>
+                 <span style="position: absolute; bottom: 5px; right: 5px; font-size: 10px; background: rgba(0,0,0,0.5); padding: 2px 4px; border-radius: 3px;">Min</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-wrapper">
+        <div id="stats">FPS: <span id="fps-val">60</span> | Triangles: <span id="tri-val">12</span></div>
+        <canvas></canvas>
+    </div>
+
+    <script type="module" src="index.js"></script>
+
+    <script>
+        document.getElementById('time-slider').addEventListener('input', (e) => {
+            document.getElementById('time-val').textContent = e.target.value;
+        });
+        document.getElementById('opacity-slider').addEventListener('input', (e) => {
+            document.getElementById('opacity-val').textContent = e.target.value;
+        });
+    </script>
+</body>
+</html>
