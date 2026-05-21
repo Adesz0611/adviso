@@ -1,205 +1,354 @@
 <!doctype html>
-<html lang="en">
+<html lang="hu">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebGPU CFD Viewer</title>
+    <title>ADVISO</title>
     <link rel="icon" href="data:,">
-    
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Színváltozók a könnyű módosításhoz */
-            --bg-canvas: #1a1a1a;
-            --bg-panel: #141414;
-            --bg-input: #2a2a2a;
-            --text-main: #e0e0e0;
-            --text-muted: #888;
-            --accent-color: #ff3b30; /* A piros szín */
-            --accent-hover: #d63026;
-            --border-color: #333;
-            --sidebar-width: 280px;
+            --bg: #07111d;
+            --panel: rgba(10, 19, 33, 0.94);
+            --panel-border: rgba(123, 158, 195, 0.18);
+            --input: rgba(20, 33, 53, 0.92);
+            --text: #e6eef8;
+            --muted: #8ca0b8;
+            --accent: #52c7ff;
+            --accent-strong: #1ea8f2;
+            --danger: #ff6b81;
+            --success: #70e0a6;
+            --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+            --sidebar-width: 340px;
         }
 
-        /* 1. FŐ ELRENDEZÉS - GÖRGETÉS TILTÁSA */
-        body, html {
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
             margin: 0;
-            padding: 0;
             width: 100%;
             height: 100%;
-            overflow: hidden; /* <--- EZ SZÜNTETI MEG A KÜLSŐ GÖRGETÉST */
-            background-color: var(--bg-canvas);
-            font-family: 'Inter', sans-serif;
-            color: var(--text-main);
-            display: flex; /* Flexbox: elemek egymás mellett */
+            overflow: hidden;
+            background:
+                radial-gradient(circle at top left, rgba(54, 112, 181, 0.28), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(0, 195, 255, 0.12), transparent 24%),
+                var(--bg);
+            color: var(--text);
+            font-family: "Inter", sans-serif;
         }
 
-        /* 2. BAL OLDALI SÁV */
+        body {
+            display: grid;
+            grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+        }
+
         #sidebar {
-            width: var(--sidebar-width);
-            height: 100%;
-            background-color: var(--bg-panel);
-            border-right: 1px solid var(--border-color); /* Választóvonal jobbra */
-            
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 16px;
             padding: 20px;
-            box-sizing: border-box; /* A padding ne növelje a méretet */
-            
-            flex-shrink: 0; /* Ne nyomódjon össze */
-            z-index: 10;
-            overflow-y: auto; /* Csak a sáv görgessen, ha nem fér ki */
+            background: var(--panel);
+            border-right: 1px solid var(--panel-border);
+            backdrop-filter: blur(18px);
+            overflow-y: auto;
         }
 
-        /* 3. CANVAS KONTÉNER (Jobb oldal) */
-        #canvas-wrapper {
-            flex-grow: 1; /* Kitölti a maradék helyet */
-            position: relative; /* Hogy a statisztika abszolút lehessen benne */
-            height: 100%;
-            background-color: black;
-            overflow: hidden; 
+        #brand {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--panel-border);
+        }
+
+        #brand h1 {
+            margin: 0;
+            font-size: 20px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        #brand p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 14px;
+            border: 1px solid var(--panel-border);
+            border-radius: 14px;
+            background: rgba(10, 21, 37, 0.62);
+            box-shadow: var(--shadow);
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 12px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        label {
+            font-size: 12px;
+            color: var(--muted);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        input[type="text"],
+        select,
+        button,
+        input[type="range"] {
+            width: 100%;
+        }
+
+        input[type="text"],
+        select {
+            border: 1px solid rgba(123, 158, 195, 0.24);
+            background: var(--input);
+            color: var(--text);
+            border-radius: 10px;
+            padding: 11px 12px;
+            outline: none;
+        }
+
+        input[type="text"]:focus,
+        select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(82, 199, 255, 0.12);
+        }
+
+        button {
+            border: 0;
+            border-radius: 10px;
+            padding: 11px 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: #021019;
+        }
+
+        button.secondary {
+            background: rgba(123, 158, 195, 0.14);
+            color: var(--text);
+        }
+
+        button:disabled,
+        select:disabled,
+        input:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        input[type="range"] {
+            accent-color: var(--accent);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .value-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .value-line span:last-child {
+            color: var(--text);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        #status {
+            min-height: 68px;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(123, 158, 195, 0.18);
+            background: rgba(6, 14, 25, 0.72);
+            font-size: 13px;
+            line-height: 1.45;
+            color: var(--muted);
+            white-space: pre-wrap;
+        }
+
+        #status.error {
+            color: #ffd4dd;
+            border-color: rgba(255, 107, 129, 0.45);
+            background: rgba(58, 12, 24, 0.66);
+        }
+
+        #status.success {
+            color: #dff9ea;
+            border-color: rgba(112, 224, 166, 0.35);
+            background: rgba(9, 40, 29, 0.68);
+        }
+
+        #canvas-wrap {
+            position: relative;
+            min-width: 0;
+            min-height: 0;
         }
 
         canvas {
-            display: block; /* Eltünteti a rejtett hézagokat */
+            display: block;
             width: 100%;
             height: 100%;
         }
 
-        /* --- UI DESIGN ELEMEK --- */
-        h2 { 
-            margin: 0 0 10px 0; 
-            font-size: 18px; 
-            font-weight: 600; 
-            color: var(--accent-color); 
-            text-transform: uppercase; 
-            letter-spacing: 1px; 
-            border-bottom: 1px solid var(--border-color); 
-            padding-bottom: 10px; 
-        }
-
-        .control-group { 
-            background-color: rgba(255,255,255,0.02); 
-            padding: 15px; 
-            border-radius: 8px; 
-            border: 1px solid var(--border-color); 
-        }
-
-        .control-group label { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            font-size: 13px; 
-            margin-bottom: 8px; 
-            color: var(--text-muted); 
-        }
-        
-        .value-display { color: var(--text-main); font-weight: 500; font-family: monospace; }
-
-        /* Input stílusok */
-        input[type=range] { width: 100%; -webkit-appearance: none; background: transparent; margin: 5px 0; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--bg-input); border-radius: 2px; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: var(--accent-color); margin-top: -6px; cursor: pointer; transition: background 0.2s; }
-        
-        select { width: 100%; padding: 8px; background-color: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px; outline: none; cursor: pointer; }
-        
-        button { width: 100%; padding: 10px; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; text-transform: uppercase; font-size: 12px; transition: background 0.2s; }
-        button:hover { background-color: var(--accent-hover); }
-
-        /* FPS Számláló (Jobb felső sarok a canvas felett) */
-        #stats {
+        #hud {
             position: absolute;
-            top: 10px;
-            right: 10px;
-            text-align: right;
-            color: var(--text-muted);
-            font-family: monospace;
-            font-size: 12px;
+            top: 16px;
+            right: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
             pointer-events: none;
-            z-index: 5;
         }
 
-        /* --- MOBIL NÉZET (< 800px) --- */
-        @media (max-width: 800px) {
-            body, html { 
-                flex-direction: column-reverse; /* Gombok alul, Canvas felül */
+        .hud-card {
+            min-width: 220px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: rgba(8, 17, 30, 0.74);
+            border: 1px solid rgba(123, 158, 195, 0.18);
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow);
+        }
+
+        .hud-title {
+            margin-bottom: 6px;
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        .hud-card .value-line {
+            font-size: 12px;
+        }
+
+        @media (max-width: 980px) {
+            body {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto minmax(0, 1fr);
             }
+
             #sidebar {
-                width: 100%;
-                height: auto;
-                max-height: 40vh; /* Max 40%-át foglalja el a képernyőnek */
-                border-right: none;
-                border-top: 1px solid var(--border-color);
+                border-right: 0;
+                border-bottom: 1px solid var(--panel-border);
+                max-height: 46vh;
+            }
+
+            #hud {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+            }
+
+            .hud-card {
+                min-width: 0;
             }
         }
     </style>
 </head>
 <body>
-
-    <div id="sidebar">
-        <h2>ADVISO</h2>
-
-        <div class="control-group">
-            <label>Variable</label>
-            <select id="variable-select">
-                <option value="velocity">Velocity</option>
-                <option value="pressure">Pressure</option>
-                <option value="temp">Temperature</option>
-            </select>
+    <aside id="sidebar">
+        <div id="brand">
+            <h1>ADVISO</h1>
+            <p>Ensight Gold surface and slice streaming over WebSocket for the WebGPU renderer.</p>
         </div>
 
-        <div class="control-group">
-            <label>
-                Time Step
-                <span class="value-display" id="time-val">0</span>
-            </label>
-            <input type="range" id="time-slider" min="0" max="100" value="0" step="1">
-            
-            <div style="display: flex; gap: 5px; margin-top: 10px;">
-                <button id="play-btn">▶ Play</button>
-                <button id="stop-btn" style="background-color: #444;">■ Stop</button>
+        <section class="panel">
+            <h2>Case</h2>
+            <div class="stack">
+                <label for="case-path">Case Path</label>
+                <input id="case-path" type="text" placeholder="/absolute/or/relative/path/to/data.case">
             </div>
-        </div>
+            <button id="load-case-btn">Load Case</button>
+            <div class="hint">The server parses the `.case` file, caches the geometry/BVH and then serves surface or slice meshes over the websocket.</div>
+        </section>
 
-        <div class="control-group">
-            <label>Visualization</label>
-            <label>
-                Mesh Opacity
-                <span class="value-display" id="opacity-val">1.0</span>
-            </label>
-            <input type="range" id="opacity-slider" min="0" max="1" step="0.05" value="1">
-            
-            <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
-                <input type="checkbox" id="wireframe-chk" style="accent-color: var(--accent-color);">
-                <label for="wireframe-chk" style="margin:0; cursor: pointer;">Show Wireframe</label>
+        <section class="panel">
+            <h2>Field</h2>
+            <div class="stack">
+                <label for="variable-select">Variable</label>
+                <select id="variable-select" disabled></select>
             </div>
-        </div>
-        
-        <div class="control-group" style="flex-grow: 1; min-height: 100px; display: flex; flex-direction: column;">
-            <label>Color Map</label>
-            <div style="flex-grow: 1; background: linear-gradient(to top, blue, cyan, green, yellow, red); border-radius: 4px; position: relative;">
-                 <span style="position: absolute; top: 5px; right: 5px; font-size: 10px; background: rgba(0,0,0,0.5); padding: 2px 4px; border-radius: 3px;">Max</span>
-                 <span style="position: absolute; bottom: 5px; right: 5px; font-size: 10px; background: rgba(0,0,0,0.5); padding: 2px 4px; border-radius: 3px;">Min</span>
+            <div class="stack">
+                <div class="value-line">
+                    <label for="time-slider">Time Step</label>
+                    <span id="time-label">0 / 0</span>
+                </div>
+                <input id="time-slider" type="range" min="0" max="0" step="1" value="0" disabled>
             </div>
-        </div>
-    </div>
+        </section>
 
-    <div id="canvas-wrapper">
-        <div id="stats">FPS: <span id="fps-val">60</span> | Triangles: <span id="tri-val">12</span></div>
+        <section class="panel">
+            <h2>View</h2>
+            <div class="row">
+                <button id="surface-btn" class="secondary" disabled>Load Surface</button>
+                <button id="slice-btn" disabled>Apply Slice</button>
+            </div>
+            <div class="stack">
+                <label for="slice-input">Slice Plane</label>
+                <input id="slice-input" type="text" value="z=0" placeholder="z=0.0 or x=1.25">
+            </div>
+            <div class="hint">Use a single input field in the form `x=...`, `y=...` or `z=...`. The request is only sent when you press the slice button.</div>
+        </section>
+
+        <section class="panel">
+            <h2>Connection</h2>
+            <div id="status">Connecting to websocket...</div>
+        </section>
+
+        <section class="panel">
+            <h2>Dataset</h2>
+            <div class="value-line"><span>Bounds Min</span><span id="bounds-min">-</span></div>
+            <div class="value-line"><span>Bounds Max</span><span id="bounds-max">-</span></div>
+            <div class="value-line"><span>Scalar Range</span><span id="scalar-range">-</span></div>
+        </section>
+    </aside>
+
+    <main id="canvas-wrap">
         <canvas></canvas>
-    </div>
+        <div id="hud">
+            <div class="hud-card">
+                <div class="hud-title">Render</div>
+                <div class="value-line"><span>FPS</span><span id="fps-value">0</span></div>
+                <div class="value-line"><span>Mode</span><span id="mode-value">idle</span></div>
+                <div class="value-line"><span>Triangles</span><span id="triangles-value">0</span></div>
+                <div class="value-line"><span>Vertices</span><span id="vertices-value">0</span></div>
+            </div>
+        </div>
+    </main>
 
     <script type="module" src="index.js"></script>
-
-    <script>
-        document.getElementById('time-slider').addEventListener('input', (e) => {
-            document.getElementById('time-val').textContent = e.target.value;
-        });
-        document.getElementById('opacity-slider').addEventListener('input', (e) => {
-            document.getElementById('opacity-val').textContent = e.target.value;
-        });
-    </script>
 </body>
 </html>
